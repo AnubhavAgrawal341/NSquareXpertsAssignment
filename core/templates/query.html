@@ -1,0 +1,218 @@
+<!-- core/templates/query.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with PDF #{{ pdf_id }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 26px;
+            color: #4a90e2;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h2 {
+            font-size: 20px;
+            color: #555;
+            margin-top: 30px;
+        }
+        #chat-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            background-color: #fafafa;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 15px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        .user {
+            background-color: #e6f7ff;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .ai {
+            background-color: #f0f0f0;
+            align-self: flex-start;
+        }
+        strong {
+            color: #4a90e2;
+        }
+        #query-form {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #query {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px 0 0 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #357abd;
+        }
+        #summary, #entities {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            margin-bottom: 10px;
+            color: #666;
+        }
+        .links {
+            text-align: center;
+            margin-top: 20px;
+        }
+        a {
+            color: #4a90e2;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chat with PDF: {{ pdf.file.name }}</h1>
+        
+        <!-- Bonus: Display summary -->
+        {% if summary %}
+        <div id="summary">
+            <h2>PDF Summary</h2>
+            <p>{{ summary }}</p>
+        </div>
+        {% endif %}
+        
+        <!-- Bonus: Display extracted entities -->
+        {% if entities %}
+        <div id="entities">
+            <h2>Extracted Entities</h2>
+            <ul>
+                {% for entity in entities %}
+                <li>{{ entity.entity_type }}: {{ entity.entity_text }} (Count: {{ entity.count }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        
+        <div id="chat-container">
+            {% for message in messages %}
+            <div class="message user">
+                <strong>You:</strong> {{ message.query }}
+            </div>
+            <div class="message ai">
+                <strong>AI:</strong> {{ message.answer }}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <form id="query-form">
+            {% csrf_token %}
+            <input type="text" id="query" placeholder="Ask a question about the PDF..." required>
+            <button type="submit">Send</button>
+        </form>
+        
+        <div class="links">
+            <a href="{% url 'upload_pdf' %}">Upload New PDF</a> | <a href="{% url 'list_pdfs' %}">Back to List</a>
+        </div>
+    </div>
+    
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const queryForm = document.getElementById('query-form');
+        const queryInput = document.getElementById('query');
+        
+        // Scroll to bottom on load
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        
+        queryForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const query = queryInput.value.trim();
+            if (!query) return;
+            
+            // Append user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'message user';
+            userMsg.innerHTML = `<strong>You:</strong> ${query}`;
+            chatContainer.appendChild(userMsg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            queryInput.value = '';
+            queryInput.disabled = true;
+            
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrf_token]').value
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                
+                if (!response.ok) throw new Error('Network error');
+                
+                const data = await response.json();
+                
+                // Append AI message
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'message ai';
+                aiMsg.innerHTML = `<strong>AI:</strong> ${data.answer}`;
+                chatContainer.appendChild(aiMsg);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            } catch (error) {
+                console.error('Error:', error);
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'message ai';
+                errorMsg.innerHTML = `<strong>AI:</strong> Error: ${error.message}`;
+                chatContainer.appendChild(errorMsg);
+            } finally {
+                queryInput.disabled = false;
+                queryInput.focus();
+            }
+        });
+    </script>
+</body>
+</html>

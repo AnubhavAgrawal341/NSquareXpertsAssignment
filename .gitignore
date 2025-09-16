@@ -1,0 +1,32 @@
+# Django/Python ignores
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.db
+db.sqlite3
+media/
+vector_stores/
+
+# Virtual environment
+env/
+venv/
+ENV/
+
+# Environment variables
+.env
+
+# Logs and temp
+*.log
+*.pot
+*.swp
+*~
+
+# IDE/Editor
+.idea/
+.vscode/
+.DS_Store
+
+# Misc
+migrations/
+!core/migrations/__init__.py
